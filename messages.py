@@ -1,37 +1,7 @@
 import struct, numpy as np
 
-class TestType:
-    def __init__(self, i8: np.int8, i16: np.int16, i32: np.int32, i64: np.int64, u8: np.uint8, u16: np.uint16, u32: np.uint32, u64: np.uint64, f32: np.float32, f64: np.float64, alias: np.uint8, arr8: np.ndarray, mat2x3: np.ndarray, buffer: np.ndarray):
-        self.header = np.uint8(0)
-        self.i8 = np.int8(i8)
-        self.i16 = np.int16(i16)
-        self.i32 = np.int32(i32)
-        self.i64 = np.int64(i64)
-        self.u8 = np.uint8(u8)
-        self.u16 = np.uint16(u16)
-        self.u32 = np.uint32(u32)
-        self.u64 = np.uint64(u64)
-        self.f32 = np.float32(f32)
-        self.f64 = np.float64(f64)
-        self.alias = np.uint8(alias)
-        self.arr8 = np.asarray(arr8, dtype=np.int8_t)  # shape [4]
-        self.mat2x3 = np.asarray(mat2x3, dtype=np.float32_t)  # shape [2, 3]
-        self.buffer = np.asarray(buffer, dtype=np.uint32_t)  # shape [10]
-
-    def pack(self) -> bytes:
-        flat = self.arr8.ravel()
-        return struct.pack('<BbhiqBHIQfdB4b6f10I', self.header, *flat)
-
-    @classmethod
-    def unpack(cls, b: bytes) -> 'TestType':
-        allv = struct.unpack('<BbhiqBHIQfdB4b6f10I', b)
-        header = allv[0]
-        data = np.array(allv[1:], dtype=np.int8_t)
-        data = data.reshape([4])
-        return cls(data)  # header is constant
-
 class HeartBeat:
-    def __init__(self, ):
+    def __init__(self):
         self.header = np.uint8(0)
 
     def pack(self) -> bytes:
@@ -43,7 +13,7 @@ class HeartBeat:
         return cls()
 
 class Reboot:
-    def __init__(self, ):
+    def __init__(self):
         self.header = np.uint8(2)
 
     def pack(self) -> bytes:
@@ -55,7 +25,7 @@ class Reboot:
         return cls()
 
 class EStop:
-    def __init__(self, ):
+    def __init__(self):
         self.header = np.uint8(4)
 
     def pack(self) -> bytes:
@@ -67,7 +37,7 @@ class EStop:
         return cls()
 
 class Enable:
-    def __init__(self, ):
+    def __init__(self):
         self.header = np.uint8(6)
 
     def pack(self) -> bytes:
@@ -79,7 +49,7 @@ class Enable:
         return cls()
 
 class Disable:
-    def __init__(self, ):
+    def __init__(self):
         self.header = np.uint8(8)
 
     def pack(self) -> bytes:
@@ -91,7 +61,7 @@ class Disable:
         return cls()
 
 class Calibrate:
-    def __init__(self, ):
+    def __init__(self):
         self.header = np.uint8(10)
 
     def pack(self) -> bytes:
@@ -115,26 +85,25 @@ class Mode:
         vals = struct.unpack('<BB', b)
         return cls(vals[1])
 
-class Pose6D:
-    def __init__(self, x: np.float32, y: np.float32, z: np.float32, roll: np.float32, pitch: np.float32, yaw: np.float32):
+class Q:
+    def __init__(self, axisAngle: np.ndarray):
         self.header = np.uint8(16)
-        self.x = np.float32(x)
-        self.y = np.float32(y)
-        self.z = np.float32(z)
-        self.roll = np.float32(roll)
-        self.pitch = np.float32(pitch)
-        self.yaw = np.float32(yaw)
+        self.axisAngle = np.asarray(axisAngle, dtype=np.float32_t)  # shape [6]
 
     def pack(self) -> bytes:
-        return struct.pack('<Bffffff', self.header, self.x, self.y, self.z, self.roll, self.pitch, self.yaw)
+        flat = self.axisAngle.ravel()
+        return struct.pack('<B6f', self.header, *flat)
 
     @classmethod
-    def unpack(cls, b: bytes) -> 'Pose6D':
-        vals = struct.unpack('<Bffffff', b)
-        return cls(vals[1], vals[2], vals[3], vals[4], vals[5], vals[6])
+    def unpack(cls, b: bytes) -> 'Q':
+        allv = struct.unpack('<B6f', b)
+        header = allv[0]
+        data = np.array(allv[1:], dtype=np.float32_t)
+        data = data.reshape([6])
+        return cls(data)  # header is constant
 
 class StagePosition:
-    def __init__(self, ):
+    def __init__(self):
         self.header = np.uint8(12)
 
     def pack(self) -> bytes:
@@ -188,3 +157,68 @@ class Trajectory:
         data = data.reshape([10000, 6])
         return cls(data)  # header is constant
 
+class ACK:
+    def __init__(self, sequence: np.uint32):
+        self.header = np.uint8(24)
+        self.sequence = np.uint32(sequence)
+
+    def pack(self) -> bytes:
+        return struct.pack('<BI', self.header, self.sequence)
+
+    @classmethod
+    def unpack(cls, b: bytes) -> 'ACK':
+        vals = struct.unpack('<BI', b)
+        return cls(vals[1])
+
+class NACK:
+    def __init__(self, sequence: np.uint32):
+        self.header = np.uint8(26)
+        self.sequence = np.uint32(sequence)
+
+    def pack(self) -> bytes:
+        return struct.pack('<BI', self.header, self.sequence)
+
+    @classmethod
+    def unpack(cls, b: bytes) -> 'NACK':
+        vals = struct.unpack('<BI', b)
+        return cls(vals[1])
+
+class SyncTime:
+    def __init__(self):
+        self.header = np.uint8(28)
+
+    def pack(self) -> bytes:
+        return struct.pack('<B', self.header)
+
+    @classmethod
+    def unpack(cls, b: bytes) -> 'SyncTime':
+        vals = struct.unpack('<B', b)
+        return cls()
+
+
+
+# --- Dispatch table and decoder ---
+msg_dispatch = {
+    0: HeartBeat,
+    2: Reboot,
+    4: EStop,
+    6: Enable,
+    8: Disable,
+    10: Calibrate,
+    14: Mode,
+    16: Q,
+    12: StagePosition,
+    18: TrajectoryLength,
+    20: FeedRate,
+    22: Trajectory,
+    24: ACK,
+    26: NACK,
+    28: SyncTime,
+}
+
+def decode_msg(blob: bytes):
+    header = blob[0]
+    cls = msg_dispatch.get(header)
+    if cls is None:
+        raise ValueError(f'Unknown message header: {header}')
+    return cls.unpack(blob)

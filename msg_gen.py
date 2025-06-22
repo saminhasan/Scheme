@@ -93,8 +93,12 @@ def gen_python(msgs, base_name):
                     params.append(f"{f['name']}: np.ndarray")
                 else:
                     params.append(f"{f['name']}: {type_map[f['type']][0]}")
-            sig = ', '.join(params)
-            py.write(f"    def __init__(self, {sig}):\n")
+            if params:
+                sig = ', '.join(params)
+                py.write(f"    def __init__(self, {sig}):\n")
+            else:
+                py.write(f"    def __init__(self):\n")
+
             # set header to its default
             header_field = next(f for f in fields if f['name']=='header')
             hdr_def = header_field['default'] or '0'
@@ -128,6 +132,24 @@ def gen_python(msgs, base_name):
                 py.write(f"        vals = struct.unpack('{fmt}', b)\n")
                 args = ', '.join(f"vals[{i}]" for i,f in enumerate(fields) if f['name']!='header')
                 py.write(f"        return cls({args})\n\n")
+
+        # Message dispatch map and decoder
+        py.write("\n\n# --- Dispatch table and decoder ---\n")
+        py.write("msg_dispatch = {\n")
+        for name, fields in msgs:
+            header_field = next(f for f in fields if f['name'] == 'header')
+            header_val = header_field['default'] or '0'
+            cls_name = name[0].upper() + name[1:]
+            py.write(f"    {header_val}: {cls_name},\n")
+        py.write("}\n\n")
+
+        py.write("def decode_msg(blob: bytes):\n")
+        py.write("    header = blob[0]\n")
+        py.write("    cls = msg_dispatch.get(header)\n")
+        py.write("    if cls is None:\n")
+        py.write("        raise ValueError(f'Unknown message header: {header}')\n")
+        py.write("    return cls.unpack(blob)\n")
+
     print(f"Generated Python -> {out_py}")
 
 # Generate C++: one struct per message with header default initializer
